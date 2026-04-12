@@ -93,10 +93,10 @@ public:
         // find the cfgs file
         fs::path cfgs_path = inference_target_path / fs::path("cfgs.yaml");
         if (!fs::exists(cfgs_path)) {
-            oss << cfgs_path << " is not found!!!";
-            MessageView::instance()->putln(oss.str());
+            std::cerr << cfgs_path << " is not found!!!" << std::endl;
             return false;
         }
+        std::cout << "Configs path: " << cfgs_path << std::endl;
 
         // load configs
         YAMLReader reader;
@@ -119,8 +119,10 @@ public:
 
         auto dof_names = env_cfg->findListing("joint_names");
         motor_dof_names.clear();
+        std::cout << "motor dof names:" << std::endl;
         for(int i=0; i<dof_names->size(); ++i){
             motor_dof_names.push_back(dof_names->at(i)->toString());
+            std::cout << i << " " << motor_dof_names.back() << std::endl;
         }
 
         auto default_angles = env_cfg->findMapping("default_joint_angles");
@@ -155,8 +157,6 @@ public:
         range_listing = command_cfg->findListing("ang_vel_range");
         ang_vel_range = Vector2(range_listing->at(0)->toDouble(), range_listing->at(1)->toDouble());
 
-        // モータDOFのindex取得
-
         // 乱数初期化
         rng.seed(std::random_device{}());
         dist_lin_x = std::uniform_real_distribution<double>(lin_vel_x_range[0], lin_vel_x_range[1]);
@@ -166,8 +166,7 @@ public:
         // load the network model
         fs::path model_path = inference_target_path / fs::path("policy_traced.pt");
         if (!fs::exists(model_path)) {
-            oss << model_path << " is not found!!!";
-            MessageView::instance()->putln(oss.str());
+            std::cerr << model_path << " is not found!!!" << std::endl;
             return false;
         }
         // model = torch::jit::load(model_path); // CUDA
