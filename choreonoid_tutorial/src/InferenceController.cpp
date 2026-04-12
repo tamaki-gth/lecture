@@ -107,7 +107,7 @@ public:
         last_action = VectorXd::Zero(num_actions);
         default_dof_pos = VectorXd::Zero(num_actions);
 
-        auto dof_names = env_cfg->findListing("dof_names");
+        auto dof_names = env_cfg->findListing("joint_names");
         motor_dof_names.clear();
         for(int i=0; i<dof_names->size(); ++i){
             motor_dof_names.push_back(dof_names->at(i)->toString());
