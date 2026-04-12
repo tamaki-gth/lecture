@@ -79,8 +79,18 @@ public:
         // command
         command = Vector3d(0.0, 0.0, 0.0);
 
+        // get the inference target path from controller option
+        fs::path inference_target_path = io->optionString();
+        if (inference_target_path.empty()) {
+            std::cerr << "Inference target path is not specified in the controller option!!!" << std::endl;
+            return false;
+        } else if (!fs::exists(inference_target_path)) {
+            std::cerr << "Inference target path: " << inference_target_path << " is not found!!!" << std::endl;
+            return false;
+        }
+        std::cout << "Inference target path: " << inference_target_path << std::endl;
+
         // find the cfgs file
-        fs::path inference_target_path = fs::path(std::getenv("HOME")) / fs::path("genesis_ws/logs/go2-walking/inference_target");
         fs::path cfgs_path = inference_target_path / fs::path("cfgs.yaml");
         if (!fs::exists(cfgs_path)) {
             oss << cfgs_path << " is not found!!!";
