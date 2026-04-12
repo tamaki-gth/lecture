@@ -15,3 +15,6 @@
 - git:
     local-name: choreonoid/ext/jaxon2_sample
     uri: https://github.com/choreonoid/jaxon2-draft.git
+- git:
+    local-name: genesis_tools
+    uri: https://github.com/kindsenior/genesis_tools.git
