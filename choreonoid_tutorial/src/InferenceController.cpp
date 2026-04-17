@@ -140,12 +140,16 @@ public:
         // joint names
         auto dof_names = env_cfg->findListing("joint_names");
         motor_dof_names.clear();
+        if(dof_names->size() != num_actions){
+            std::cerr << "The size of joint_names in cfgs.yaml should be the same as num_actions!!!" << std::endl;
+            return false;
+        }
         std::cout << "motor dof names:" << std::endl;
         for(int i=0; i<dof_names->size(); ++i){
             motor_dof_names.push_back(dof_names->at(i)->toString());
             std::cout << i << " " << motor_dof_names.back() << std::endl;
         }
-
+        // default joint angles
         auto default_angles = env_cfg->findMapping("default_joint_angles");
         for(int i=0; i<motor_dof_names.size(); ++i){
             std::string name = motor_dof_names[i];
