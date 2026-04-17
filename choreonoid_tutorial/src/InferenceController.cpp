@@ -31,15 +31,19 @@ class InferenceController1 : public SimpleController
 
     torch::jit::script::Module model;
 
+    bool obs_pos_enabled = false;
+
     // Config values
     double P_gain;
     double D_gain;
     int num_actions;
+    int num_obs;
     double action_scale;
     double ang_vel_scale;
     double lin_vel_scale;
     double dof_pos_scale;
     double dof_vel_scale;
+    Vector3 pos_scales;
     Vector3 command_scale;
 
     // Command resampling
@@ -140,10 +144,24 @@ public:
         action_scale = env_cfg->get("action_scale", 1.0);
 
         // obs_cfg
+        num_obs = obs_cfg->get("num_obs", -1);
         ang_vel_scale = obs_cfg->findMapping("obs_scales")->get("ang_vel", 1.0);
         lin_vel_scale = obs_cfg->findMapping("obs_scales")->get("lin_vel", 1.0);
         dof_pos_scale = obs_cfg->findMapping("obs_scales")->get("dof_pos", 1.0);
         dof_vel_scale = obs_cfg->findMapping("obs_scales")->get("dof_vel", 1.0);
+        if(auto pos_listing = obs_cfg->findMapping("obs_scales")->findListing("pos")){
+            if(pos_listing->size() == pos_scales.size()){
+                obs_pos_enabled = true;
+                for(int i=0; i<pos_scales.size(); ++i){
+                    pos_scales[i] = pos_listing->at(i)->toDouble();
+                }
+                std::cout << "cfgs.yaml includes obs_scales.pos: " << pos_scales.transpose() << std::endl;
+            }
+        } else {
+            obs_pos_enabled = false;
+            pos_scales.setZero();
+            std::cout << "cfgs.yaml does not include obs_scales.pos, position observation will be disabled." << std::endl;
+        }
 
         command_scale[0] = lin_vel_scale;
         command_scale[1] = lin_vel_scale;
@@ -178,7 +196,15 @@ public:
         return true;
     }
 
-    bool inference(VectorXd& target_dof_pos, const Vector3d& angular_velocity, const Vector3d& projected_gravity, const VectorXd& joint_pos, const VectorXd& joint_vel) {
+    bool inference(
+        VectorXd& target_dof_pos,
+        const Vector3d& base_pos,
+        const Vector3d& angular_velocity,
+        const Vector3d& projected_gravity,
+        const VectorXd& joint_pos,
+        const VectorXd& joint_vel
+    )
+    {
         try {
             // observation vector
             std::vector<float> obs_vec;
@@ -188,6 +214,16 @@ public:
             for(int i=0; i<num_actions; ++i) obs_vec.push_back((joint_pos[i] - default_dof_pos[i]) * dof_pos_scale);
             for(int i=0; i<num_actions; ++i) obs_vec.push_back(joint_vel[i] * dof_vel_scale);
             for(int i=0; i<num_actions; ++i) obs_vec.push_back(last_action[i]);
+            // add base position to the observation if enabled
+            if(obs_pos_enabled){
+                for(int i=0; i<pos_scales.size(); ++i) obs_vec.push_back(base_pos[i] * pos_scales[i]);
+            }
+
+            // check the observation vector size
+            if(num_obs > 0 && static_cast<int>(obs_vec.size()) != num_obs){
+                std::cerr << "The size of the observation vector: " << obs_vec.size() << " is different from num_obs specified in cfgs.yaml: " << num_obs << std::endl;
+                return false;
+            }
 
             // auto input = torch::from_blob(obs_vec.data(), {1, (long)obs_vec.size()}, torch::kFloat32).to(torch::kCUDA);
             auto input = torch::from_blob(obs_vec.data(), {1, (long)obs_vec.size()}, torch::kFloat32).to(torch::kCPU);
@@ -228,6 +264,7 @@ public:
         // get current states
         const auto rootLink = ioBody->rootLink();
         const Isometry3d root_coord = rootLink->T();
+        Vector3 base_pos = root_coord.translation();
         Vector3 angular_velocity = root_coord.linear().transpose() * rootLink->w();
         Vector3 projected_gravity = root_coord.linear().transpose() * global_gravity;
 
@@ -240,7 +277,7 @@ public:
 
         // inference
         if (step_count % inference_interval_steps == 0) {
-            inference(target_dof_pos, angular_velocity, projected_gravity, joint_pos, joint_vel);
+            inference(target_dof_pos, base_pos, angular_velocity, projected_gravity, joint_pos, joint_vel);
             // target_dof_vel = (target_dof_pos - target_dof_pos_prev) / inference_dt;
             // target_dof_pos_prev = target_dof_pos;
         }
