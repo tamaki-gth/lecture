@@ -36,6 +36,7 @@ class InferenceController1 : public SimpleController
     // Config values
     double P_gain;
     double D_gain;
+    VectorXd pdgain_rate;
     int num_actions;
     int num_obs;
     double action_scale;
@@ -111,16 +112,32 @@ public:
         auto command_cfg = root->findMapping("command_cfg");
 
         // env_cfg
-        P_gain = env_cfg->get("kp", 20);
-        D_gain = env_cfg->get("kd", 0.5);
-
-        resample_interval_steps = static_cast<int>(std::round(env_cfg->get("resampling_time_s", 4.0) / dt));
-
         // joint values
         num_actions = env_cfg->get("num_actions", 1);
         last_action = VectorXd::Zero(num_actions);
         default_dof_pos = VectorXd::Zero(num_actions);
-
+        // PD gains
+        P_gain = env_cfg->get("kp", 20);
+        D_gain = env_cfg->get("kd", 0.5);
+        // pdgain_rate
+        if(auto pdgain_rate_listing = env_cfg->findListing("pdgain_rate")){
+            if(pdgain_rate_listing->size() == num_actions){
+                pdgain_rate = VectorXd(num_actions);
+                for(int i=0; i<num_actions; ++i){
+                    pdgain_rate[i] = pdgain_rate_listing->at(i)->toDouble();
+                }
+                std::cout << "cfgs.yaml includes pdgain_rate: " << pdgain_rate.transpose() << std::endl;
+            } else {
+                std::cerr << "The size of pdgain_rate in cfgs.yaml should be the same as num_actions!!!" << std::endl;
+                return false;
+            }
+        } else {
+            pdgain_rate = VectorXd::Ones(num_actions);
+            std::cout << "cfgs.yaml does not include pdgain_rate, using default value: " << pdgain_rate.transpose() << std::endl;
+        }
+        // command resampling interval
+        resample_interval_steps = static_cast<int>(std::round(env_cfg->get("resampling_time_s", 4.0) / dt));
+        // joint names
         auto dof_names = env_cfg->findListing("joint_names");
         motor_dof_names.clear();
         std::cout << "motor dof names:" << std::endl;
@@ -288,7 +305,7 @@ public:
             double q = joint->q();
             double dq = joint->dq();
             // double u = P_gain * (target_dof_pos[i] - q) + D_gain * (target_dof_vel[i] - dq);
-            double u = P_gain * (target_dof_pos[i] - q) + D_gain * (- dq);
+            double u = (P_gain * (target_dof_pos[i] - q) + D_gain * (- dq)) * pdgain_rate[i];
             joint->u() = u;
         }
 
