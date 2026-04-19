@@ -22,7 +22,7 @@ items:
           class: BodyItem
           is_checked: true
           data:
-            file: "${HOME}/genesis_ws/Genesis/genesis/assets/urdf/go2/urdf/go2.urdf"
+            file: "${HOME}/genesis_ws/venv_genesis/src/genesis-world/genesis/assets/urdf/go2/urdf/go2.urdf"
             format: URDF
             rootPosition: [ 0, 0, 0.42 ]
             rootAttitude: [
