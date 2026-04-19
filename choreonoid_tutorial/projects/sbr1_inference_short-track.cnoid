@@ -55,7 +55,7 @@ items:
               class: SimpleControllerItem
               data:
                 isNoDelayMode: false
-                controllerOptions: ""
+                controllerOptions: "/home/rl-user/logs/sbr1_locomotion/test"
                 controller: "InferenceController"
                 base_directory: "Controller directory"
                 reloading: false
