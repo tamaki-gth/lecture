@@ -120,20 +120,19 @@ public:
         P_gain = env_cfg->get("kp", 20);
         D_gain = env_cfg->get("kd", 0.5);
         // pdgain_rate
-        if(auto pdgain_rate_listing = env_cfg->findListing("pdgain_rate")){
-            if(pdgain_rate_listing->size() == num_actions){
-                pdgain_rate = VectorXd(num_actions);
-                for(int i=0; i<num_actions; ++i){
-                    pdgain_rate[i] = pdgain_rate_listing->at(i)->toDouble();
-                }
-                std::cout << "cfgs.yaml includes pdgain_rate: " << pdgain_rate.transpose() << std::endl;
-            } else {
-                std::cerr << "The size of pdgain_rate in cfgs.yaml should be the same as num_actions!!!" << std::endl;
-                return false;
-            }
-        } else {
+        auto pdgain_rate_listing = env_cfg->findListing("pdgain_rate");
+        if(!pdgain_rate_listing || pdgain_rate_listing->size() == 0){
             pdgain_rate = VectorXd::Ones(num_actions);
             std::cout << "cfgs.yaml does not include pdgain_rate, using default value: " << pdgain_rate.transpose() << std::endl;
+        } else if(pdgain_rate_listing->size() == num_actions){
+            pdgain_rate = VectorXd(num_actions);
+            for(int i = 0; i < num_actions; ++i){
+                pdgain_rate[i] = pdgain_rate_listing->at(i)->toDouble();
+            }
+            std::cout << "cfgs.yaml includes pdgain_rate: " << pdgain_rate.transpose() << std::endl;
+        } else {
+            std::cerr << "The size of pdgain_rate in cfgs.yaml should be the same as num_actions!!!" << std::endl;
+            return false;
         }
         // command resampling interval
         resample_interval_steps = static_cast<int>(std::round(env_cfg->get("resampling_time_s", 4.0) / dt));
