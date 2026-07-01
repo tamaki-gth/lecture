@@ -275,9 +275,12 @@ public:
     {
 
         if(step_count % resample_interval_steps == 0){
-            command[0] = dist_lin_x(rng);
-            command[1] = dist_lin_y(rng);
-            command[2] = dist_ang(rng);
+            // command[0] = dist_lin_x(rng);
+            // command[1] = dist_lin_y(rng);
+            // command[2] = dist_ang(rng);
+            command[0] = 4.0;
+            command[1] = 0.0;
+            command[2] = 0.0;
             std::cout << "command velocity:" << command.transpose() << std::endl;
         }
 
