@@ -28,6 +28,7 @@ class InferenceController1 : public SimpleController
     // VectorXd target_dof_pos_prev;
     // VectorXd target_dof_vel;
     std::vector<std::string> motor_dof_names;
+    std::ofstream logFile;
 
     torch::jit::script::Module model;
 
@@ -213,7 +214,30 @@ public:
         model.to(torch::kCPU);
         model.eval();
 
+        logFile.open("inference_log.csv");
+        logFile << "step,time,cmd_vx,base_vx";
+        for(int i=0; i<num_actions; ++i){
+            logFile << ",q_" << motor_dof_names[i];
+        }
+        for(int i=0; i<num_actions; ++i){
+            logFile << ",dq_" << motor_dof_names[i];
+        }   
+        for(int i=0; i<num_actions; ++i){
+            logFile << ",target_" << motor_dof_names[i];
+        }             
+        for(int i=0; i<num_actions; ++i){
+            logFile << ",action_" << motor_dof_names[i];
+        }
+        for(int i=0; i<num_actions; ++i){
+            logFile << ",torque_" << motor_dof_names[i];
+        }
+        logFile << "\n";
+
+
         return true;
+
+
+ 
     }
 
     bool inference(
@@ -273,12 +297,13 @@ public:
 
     virtual bool control() override
     {
-
+        double time =step_count*dt;
+        
         if(step_count % resample_interval_steps == 0){
             // command[0] = dist_lin_x(rng);
             // command[1] = dist_lin_y(rng);
             // command[2] = dist_ang(rng);
-            command[0] = 4.0;
+            command[0] = 3.0;
             command[1] = 0.0;
             command[2] = 0.0;
             std::cout << "command velocity:" << command.transpose() << std::endl;
@@ -290,8 +315,10 @@ public:
         Vector3 base_pos = root_coord.translation();
         Vector3 angular_velocity = root_coord.linear().transpose() * rootLink->w();
         Vector3 projected_gravity = root_coord.linear().transpose() * global_gravity;
+        //前進速度を計算
+        Vector3 linear_velocity = root_coord.linear().transpose() * rootLink->v();
 
-        VectorXd joint_pos(num_actions), joint_vel(num_actions);
+        VectorXd joint_pos(num_actions), joint_vel(num_actions), torque(num_actions);
         for(int i=0; i<num_actions; ++i){
             auto joint = ioBody->joint(motor_dof_names[i]);
             joint_pos[i] = joint->q();
@@ -312,8 +339,29 @@ public:
             double dq = joint->dq();
             // double u = P_gain * (target_dof_pos[i] - q) + D_gain * (target_dof_vel[i] - dq);
             double u = (P_gain * (target_dof_pos[i] - q) + D_gain * (- dq)) * pdgain_rate[i];
+            torque[i]=u;
             joint->u() = u;
         }
+
+        logFile<<step_count<<","<<time<<","<<command[0]<<","<<linear_velocity.x();
+        for(int i=0;i<num_actions;i++){
+            logFile<<","<<joint_pos[i];
+        }
+        for(int i=0;i<num_actions;i++){
+            logFile<<","<<joint_vel[i];
+        }        
+        for(int i=0;i<num_actions;i++){
+            logFile<<","<<target_dof_pos[i];
+        }
+        for(int i=0;i<num_actions;i++){
+            logFile<<","<<last_action[i];
+        }
+        for(int i=0;i<num_actions;i++){
+            logFile<<","<<torque[i];
+        }
+        logFile<<"\n";
+
+           
 
         ++step_count;
 
