@@ -31,7 +31,7 @@ class InferenceController1 : public SimpleController
     std::vector<std::string> motor_dof_names;
     std::ofstream logFile;
 
-    // ↓ ★これを追加
+    // ↓ ★これを追加する
     ForceSensor* leftForceSensor;
     ForceSensor* rightForceSensor;
     torch::jit::script::Module model;
