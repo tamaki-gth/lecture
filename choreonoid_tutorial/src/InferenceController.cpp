@@ -2,6 +2,7 @@
 #include <cnoid/SimpleController>
 #include <cnoid/ValueTree>
 #include <cnoid/YAMLReader>
+#include <cnoid/ForceSensor>  // ← ★これを追加
 
 #include <torch/torch.h>
 #include <torch/script.h>
@@ -30,6 +31,9 @@ class InferenceController1 : public SimpleController
     std::vector<std::string> motor_dof_names;
     std::ofstream logFile;
 
+    // ↓ ★これを追加
+    ForceSensor* leftForceSensor;
+    ForceSensor* rightForceSensor;
     torch::jit::script::Module model;
 
     bool obs_pos_enabled = false;
@@ -67,6 +71,23 @@ public:
     {
         dt = io->timeStep();
         ioBody = io->body();
+
+        // ↓ ★ここから追加（センサの取得と有効化）
+        leftForceSensor = ioBody->findDevice<ForceSensor>("LeftForceSensor");
+        rightForceSensor = ioBody->findDevice<ForceSensor>("RightForceSensor");
+        if(leftForceSensor){
+            io->enableInput(leftForceSensor);
+            std::cout << "★★★ Left Force Sensor Found! ★★★" << std::endl; 
+        } else {
+            std::cout << "★★★ WARNING: Left Force Sensor NOT Found! ★★★" << std::endl;
+        }
+        if(rightForceSensor){
+            io->enableInput(rightForceSensor);
+            std::cout << "★★★ Right Force Sensor Found! ★★★" << std::endl;
+        } else {
+            std::cout << "★★★ WARNING: Right Force Sensor NOT Found! ★★★" << std::endl;
+        }
+        // ↑ ★ここまで追加
 
         inference_interval_steps = static_cast<int>(std::round(inference_dt / dt));
         std::ostringstream oss;
@@ -215,7 +236,7 @@ public:
         model.eval();
 
         logFile.open("inference_log.csv");
-        logFile << "step,time,cmd_vx,base_vx";
+        logFile << "step,time,cmd_vx,base_vx,base_vy,base_vz,proj_g_x,proj_g_y,grf_left_z,grf_right_z";        
         for(int i=0; i<num_actions; ++i){
             logFile << ",q_" << motor_dof_names[i];
         }
@@ -233,11 +254,7 @@ public:
         }
         logFile << "\n";
 
-
-        return true;
-
-
- 
+        return true; 
     }
 
     bool inference(
@@ -303,7 +320,7 @@ public:
             // command[0] = dist_lin_x(rng);
             // command[1] = dist_lin_y(rng);
             // command[2] = dist_ang(rng);
-            command[0] = 3.0;
+            command[0] = 3.4;
             command[1] = 0.0;
             command[2] = 0.0;
             std::cout << "command velocity:" << command.transpose() << std::endl;
@@ -343,7 +360,18 @@ public:
             joint->u() = u;
         }
 
-        logFile<<step_count<<","<<time<<","<<command[0]<<","<<linear_velocity.x();
+        // ↓ ★ここから追加：反力Z方向を取得
+        double fz_left = 0.0;
+        double fz_right = 0.0;
+        if(leftForceSensor){
+            fz_left = leftForceSensor->f()[2]; 
+        }
+        if(rightForceSensor){
+            fz_right = rightForceSensor->f()[2];
+        }
+        // ↑ ★ここまで追加
+
+        logFile<<step_count<<","<<time<<","<<command[0]<<","<<linear_velocity.x()<<","<<linear_velocity.y()<<","<<linear_velocity.z()<<","<<projected_gravity[0]<<","<<projected_gravity[1]<<","<<fz_left<<","<<fz_right;
         for(int i=0;i<num_actions;i++){
             logFile<<","<<joint_pos[i];
         }
